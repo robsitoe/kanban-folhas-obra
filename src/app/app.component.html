@@ -1,23 +1,29 @@
-<div class="login-screen" *ngIf="!auth.authenticated()">
+<div class="login-screen" *ngIf="auth.checkingSession()">
+  <p class="login-loading">A verificar sessão...</p>
+</div>
+
+<div class="login-screen" *ngIf="!auth.checkingSession() && !auth.authenticated()">
   <form class="login-box" (ngSubmit)="submitLogin()">
     <h1>Folhas de Obra</h1>
     <span class="subtitle">Mavi-Gás &amp; Comércio Geral</span>
 
     <label>
-      Utilizador
-      <input type="text" autocomplete="username" [ngModel]="loginUsername()" (ngModelChange)="loginUsername.set($event)" name="username" />
+      Email
+      <input type="email" autocomplete="username" [ngModel]="loginEmail()" (ngModelChange)="loginEmail.set($event)" name="email" />
     </label>
     <label>
       Password
       <input type="password" autocomplete="current-password" [ngModel]="loginPassword()" (ngModelChange)="loginPassword.set($event)" name="password" />
     </label>
-    <p class="modal-error" *ngIf="loginError()">Utilizador ou password incorretos.</p>
+    <p class="modal-error" *ngIf="loginError()">{{ loginError() }}</p>
 
-    <button type="submit" class="btn-primary">Entrar</button>
+    <button type="submit" class="btn-primary" [disabled]="loginSubmitting()">
+      {{ loginSubmitting() ? 'A entrar...' : 'Entrar' }}
+    </button>
   </form>
 </div>
 
-<div class="app" *ngIf="auth.authenticated()">
+<div class="app" *ngIf="!auth.checkingSession() && auth.authenticated()">
   <div class="sync-banner" *ngIf="store.syncError() as err">⚠ {{ err }}</div>
   <div class="sync-banner sync-banner-loading" *ngIf="store.loading()">A carregar dados...</div>
 
@@ -47,6 +53,7 @@
         <button [class.active]="view() === 'summary'" (click)="view.set('summary')">📋 Resumo</button>
       </div>
       <button class="btn-primary" (click)="openNewForm()">+ Novo evento</button>
+      <span class="user-email" *ngIf="auth.userEmail() as email">{{ email }}</span>
       <button class="btn-icon" (click)="logout()" title="Terminar sessão">🚪 Sair</button>
     </div>
   </header>

@@ -131,25 +131,28 @@ export class AppComponent {
   view = signal<ViewMode>('board');
   calendarMonth = signal<Date>(new Date());
 
-  loginUsername = signal('');
+  loginEmail = signal('');
   loginPassword = signal('');
-  loginError = signal(false);
+  loginError = signal<string | null>(null);
+  loginSubmitting = signal(false);
 
   constructor(public store: EventStorageService, public auth: AuthService) {}
 
-  submitLogin(): void {
-    const ok = this.auth.login(this.loginUsername(), this.loginPassword());
-    if (!ok) {
-      this.loginError.set(true);
+  async submitLogin(): Promise<void> {
+    this.loginSubmitting.set(true);
+    const error = await this.auth.login(this.loginEmail(), this.loginPassword());
+    this.loginSubmitting.set(false);
+    if (error) {
+      this.loginError.set(error);
       return;
     }
-    this.loginError.set(false);
-    this.loginUsername.set('');
+    this.loginError.set(null);
+    this.loginEmail.set('');
     this.loginPassword.set('');
   }
 
   logout(): void {
-    this.auth.logout();
+    void this.auth.logout();
   }
 
   scheduledEvents = computed(() => this.store.events().filter((e) => !!e.dataAgendamento));

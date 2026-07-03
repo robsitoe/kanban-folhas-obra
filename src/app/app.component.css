@@ -65,6 +65,22 @@
   font-size: 14px;
 }
 
+.login-box .btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-loading {
+  color: #fff;
+  font-size: 14px;
+}
+
+.user-email {
+  color: rgba(255,255,255,0.85);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .sync-banner {
   padding: 6px 16px;
   font-size: 12px;
