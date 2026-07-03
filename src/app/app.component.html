@@ -1,0 +1,470 @@
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <h1>Folhas de Obra</h1>
+      <span class="subtitle">Mavi-Gás &amp; Comércio Geral</span>
+    </div>
+    <div class="topbar-actions">
+      <span class="overdue-pill" *ngIf="overdueCount() > 0" (click)="onlyOverdue.set(true); showFilters.set(true)">
+        ⚠ {{ overdueCount() }} atrasado{{ overdueCount() > 1 ? 's' : '' }}
+      </span>
+      <input
+        class="search"
+        type="text"
+        placeholder="Pesquisar evento, responsável..."
+        [ngModel]="searchTerm()"
+        (ngModelChange)="searchTerm.set($event)"
+      />
+      <button class="btn-icon" (click)="showFilters.set(!showFilters())" [class.active]="activeFilterCount() > 0">
+        Filtros<span class="filter-count" *ngIf="activeFilterCount() > 0">{{ activeFilterCount() }}</span>
+      </button>
+      <button class="btn-icon" (click)="exportCsv()">⬇ Exportar</button>
+      <div class="view-toggle">
+        <button [class.active]="view() === 'board'" (click)="view.set('board')">🗂 Quadro</button>
+        <button [class.active]="view() === 'calendar'" (click)="view.set('calendar')">📅 Calendário</button>
+        <button [class.active]="view() === 'summary'" (click)="view.set('summary')">📋 Resumo</button>
+      </div>
+      <button class="btn-primary" (click)="openNewForm()">+ Novo evento</button>
+    </div>
+  </header>
+
+  <div class="filter-bar" *ngIf="showFilters() && view() !== 'calendar'">
+    <label>
+      Responsável
+      <select [ngModel]="filterResponsavel()" (ngModelChange)="filterResponsavel.set($event)">
+        <option value="">Todos</option>
+        <option *ngFor="let r of responsavelOptions()" [value]="r">{{ r }}</option>
+      </select>
+    </label>
+    <label>
+      Prioridade
+      <select [ngModel]="filterPrioridade()" (ngModelChange)="filterPrioridade.set($event)">
+        <option value="">Todas</option>
+        <option value="Baixa">Baixa</option>
+        <option value="Média">Média</option>
+        <option value="Alta">Alta</option>
+      </select>
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" [ngModel]="onlyOverdue()" (ngModelChange)="onlyOverdue.set($event)" />
+      Só atrasados
+    </label>
+    <div class="status-filter">
+      <span class="status-filter-label">Estado</span>
+      <div class="status-chips">
+        <button
+          type="button"
+          class="status-chip"
+          *ngFor="let s of columns"
+          [ngClass]="columnClass(s)"
+          [class.active]="isStatusFilterActive(s)"
+          (click)="toggleStatusFilter(s)"
+        >
+          {{ s }}
+        </button>
+      </div>
+    </div>
+    <button class="btn-secondary" (click)="clearFilters()" *ngIf="activeFilterCount() > 0 || searchTerm()">Limpar filtros</button>
+  </div>
+
+  <main class="board" cdkDropListGroup *ngIf="view() === 'board'">
+    <section
+      class="column"
+      *ngFor="let status of columns"
+      [ngClass]="columnClass(status)"
+    >
+      <div class="column-header">
+        <h2>{{ status }}</h2>
+        <span class="count">{{ eventsByStatus(status).length }}</span>
+      </div>
+
+      <div
+        class="column-body"
+        cdkDropList
+        [id]="dropId(status)"
+        [cdkDropListData]="eventsByStatus(status)"
+        [cdkDropListConnectedTo]="connectedDropLists()"
+        (cdkDropListDropped)="onDrop($event, status)"
+      >
+        <div
+          class="card"
+          [class.overdue]="isOverdue(ev)"
+          *ngFor="let ev of eventsByStatus(status)"
+          cdkDrag
+          [cdkDragData]="ev"
+          (click)="openHistory(ev)"
+          title="Clicar para ver o histórico"
+        >
+          <div class="card-drag-preview" *cdkDragPreview>
+            <strong>{{ ev.titulo }}</strong>
+          </div>
+
+          <div class="card-top">
+            <div class="card-badges">
+              <span class="badge" [ngClass]="priorityClass(ev.prioridade)">{{ ev.prioridade }}</span>
+              <span class="badge badge-overdue" *ngIf="isOverdue(ev)">⚠ Atrasado</span>
+            </div>
+            <div class="card-actions" (click)="$event.stopPropagation()">
+              <button class="icon-btn" (click)="openEditForm(ev)" title="Editar">✎</button>
+              <button class="icon-btn danger" (click)="deleteEvent(ev.id)" title="Apagar">✕</button>
+            </div>
+          </div>
+
+          <p class="card-title">{{ ev.titulo }}</p>
+          <p class="card-client" *ngIf="ev.clienteNome">🧑‍💼 {{ ev.clienteNome }}</p>
+          <p class="card-desc" *ngIf="ev.descricao">{{ ev.descricao }}</p>
+
+          <div class="card-meta">
+            <span *ngIf="ev.responsavel">👤 {{ ev.responsavel }}</span>
+            <span [class.overdue-text]="isOverdue(ev)" *ngIf="ev.dataPrevista">📅 {{ ev.dataPrevista | date: 'dd/MM/yyyy' }}</span>
+            <span class="card-history-count" title="Registos no histórico">🕒 {{ (ev.historico ?? []).length }}</span>
+          </div>
+
+          <div class="card-budget" *ngIf="ev.valorOrcamento">
+            💰 {{ formatCurrency(ev.valorOrcamento) }}<span *ngIf="ev.condicaoPagamento"> · {{ ev.condicaoPagamento }}</span>
+          </div>
+
+          <div class="card-schedule" [class.schedule-overdue]="isScheduleOverdue(ev)" *ngIf="ev.dataAgendamento">
+            🗓️ <span *ngIf="isScheduleOverdue(ev)">⚠ </span>Visita: {{ ev.dataAgendamento | date: 'dd/MM/yyyy HH:mm' }}
+          </div>
+
+          <div class="card-debt" *ngIf="saldoPendente(ev) > 0">
+            💳 Saldo pendente: {{ formatCurrency(saldoPendente(ev)) }}
+          </div>
+        </div>
+
+        <button class="add-card-btn" (click)="openNewForm(status)">+ Adicionar cartão</button>
+      </div>
+    </section>
+  </main>
+
+  <section class="calendar" *ngIf="view() === 'calendar'">
+    <div class="calendar-header">
+      <button class="btn-icon" (click)="prevMonth()">‹ Anterior</button>
+      <div class="calendar-title">
+        <h2>{{ monthLabel() }}</h2>
+        <button class="btn-secondary calendar-today-btn" (click)="goToToday()">Hoje</button>
+      </div>
+      <button class="btn-icon" (click)="nextMonth()">Seguinte ›</button>
+    </div>
+
+    <div class="calendar-weekdays">
+      <span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span>
+    </div>
+
+    <div class="calendar-grid">
+      <div class="calendar-day" *ngFor="let day of calendarDays()" [class.out-month]="!day.inMonth" [class.today]="day.isToday">
+        <span class="calendar-day-number">{{ day.date.getDate() }}</span>
+        <div class="calendar-events">
+          <div
+            class="calendar-chip"
+            [ngClass]="columnClass(ev.status)"
+            [class.chip-overdue]="isScheduleOverdue(ev)"
+            *ngFor="let ev of day.events"
+            (click)="openHistory(ev)"
+            [title]="ev.titulo + ' — ' + ev.responsavel"
+          >
+            <span *ngIf="isScheduleOverdue(ev)">⚠ </span>{{ scheduleTime(ev) }} · {{ ev.titulo }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="summary" *ngIf="view() === 'summary'">
+    <table class="summary-table">
+      <thead>
+        <tr>
+          <th>Estado</th>
+          <th>Título</th>
+          <th>Cliente</th>
+          <th>Contacto</th>
+          <th>Responsável</th>
+          <th>Prioridade</th>
+          <th>Saldo pendente</th>
+          <th>Motivo mais recente</th>
+        </tr>
+      </thead>
+      <tbody>
+        <ng-container *ngFor="let group of summaryGroups()">
+          <tr
+            class="summary-table-row"
+            *ngFor="let ev of group.events"
+            [class.overdue-row]="isOverdue(ev)"
+            (click)="openHistory(ev)"
+          >
+            <td><span class="summary-status-tag" [ngClass]="columnClass(ev.status)">{{ ev.status }}</span></td>
+            <td class="summary-title-cell">{{ ev.titulo }}</td>
+            <td>{{ ev.clienteNome || '—' }}</td>
+            <td>{{ ev.clienteContacto || '—' }}</td>
+            <td>{{ ev.responsavel || '—' }}</td>
+            <td><span class="badge" [ngClass]="priorityClass(ev.prioridade)">{{ ev.prioridade }}</span></td>
+            <td [class.summary-debt-cell]="saldoPendente(ev) > 0">
+              {{ saldoPendente(ev) > 0 ? formatCurrency(saldoPendente(ev)) : '—' }}
+            </td>
+            <td class="summary-reason-cell">{{ summaryReason(ev) }}</td>
+          </tr>
+        </ng-container>
+        <tr *ngIf="summaryGroups().length === 0 || filteredEvents().length === 0">
+          <td colspan="8" class="summary-empty-row">Sem folhas de obra a mostrar.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <div class="modal-overlay" *ngIf="pendingSchedule() as ps" (click)="cancelSchedule()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3>Agendar visita</h3>
+      <p class="modal-subtitle">"{{ ps.titulo }}" — defina a data e hora combinadas com o cliente.</p>
+
+      <label>
+        Data e hora do agendamento
+        <input
+          type="datetime-local"
+          [ngModel]="scheduleDateTime()"
+          (ngModelChange)="scheduleDateTime.set($event)"
+        />
+      </label>
+
+      <label>
+        Observações (opcional)
+        <textarea
+          rows="2"
+          placeholder="Ex: cliente confirmou disponibilidade à tarde..."
+          [ngModel]="scheduleObservacao()"
+          (ngModelChange)="scheduleObservacao.set($event)"
+        ></textarea>
+      </label>
+      <p class="modal-error" *ngIf="scheduleError()">Indique a data e hora do agendamento.</p>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" (click)="cancelSchedule()">Cancelar</button>
+        <button class="btn-primary" (click)="confirmSchedule()">Confirmar agendamento</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" *ngIf="pendingPayment() as pp" (click)="cancelPayment()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3>Confirmar pagamento final</h3>
+      <p class="modal-subtitle">
+        "{{ pp.titulo }}" — o cliente pagou apenas o sinal de 60%; confirme a receção do saldo antes de finalizar.
+      </p>
+
+      <label>
+        Valor recebido (MT)
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          [ngModel]="paymentValor()"
+          (ngModelChange)="paymentValor.set($event)"
+        />
+      </label>
+
+      <label>
+        Observações (opcional)
+        <textarea
+          rows="2"
+          placeholder="Ex: pago por transferência, comprovativo anexado..."
+          [ngModel]="paymentObservacao()"
+          (ngModelChange)="paymentObservacao.set($event)"
+        ></textarea>
+      </label>
+      <p class="modal-error" *ngIf="paymentError()">Indique o valor recebido.</p>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" (click)="cancelPayment()">Cancelar</button>
+        <button class="btn-primary" (click)="confirmPayment()">Confirmar pagamento</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" *ngIf="showForm()" (click)="closeForm()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3>{{ editingId() ? 'Editar evento' : 'Novo evento' }}</h3>
+
+      <label>
+        Título
+        <input type="text" [ngModel]="form().titulo" (ngModelChange)="setField('titulo', $event)" />
+      </label>
+      <p class="modal-error" *ngIf="formError()">O título é obrigatório para guardar.</p>
+
+      <label>
+        Trabalho a realizar
+        <textarea rows="2" [ngModel]="form().descricao" (ngModelChange)="setField('descricao', $event)"></textarea>
+      </label>
+
+      <h4 class="form-section-title">Dados do cliente</h4>
+
+      <label>
+        Nome do cliente
+        <input type="text" [ngModel]="form().clienteNome" (ngModelChange)="setField('clienteNome', $event)" />
+      </label>
+
+      <div class="form-row">
+        <label>
+          Contacto
+          <input type="text" placeholder="Ex: 84 123 4567" [ngModel]="form().clienteContacto" (ngModelChange)="setField('clienteContacto', $event)" />
+        </label>
+        <label>
+          Endereço
+          <input type="text" [ngModel]="form().clienteEndereco" (ngModelChange)="setField('clienteEndereco', $event)" />
+        </label>
+      </div>
+
+      <h4 class="form-section-title">Detalhes internos</h4>
+
+      <div class="form-row">
+        <label>
+          Responsável
+          <input type="text" [ngModel]="form().responsavel" (ngModelChange)="setField('responsavel', $event)" />
+        </label>
+        <label>
+          Data prevista
+          <input type="date" [ngModel]="form().dataPrevista" (ngModelChange)="setField('dataPrevista', $event)" />
+        </label>
+      </div>
+
+      <div class="form-row">
+        <label>
+          Prioridade
+          <select [ngModel]="form().prioridade" (ngModelChange)="setField('prioridade', $event)">
+            <option value="Baixa">Baixa</option>
+            <option value="Média">Média</option>
+            <option value="Alta">Alta</option>
+          </select>
+        </label>
+        <label>
+          Status
+          <select [ngModel]="form().status" (ngModelChange)="setField('status', $event)">
+            <option *ngFor="let s of columns" [value]="s">{{ s }}</option>
+          </select>
+        </label>
+      </div>
+
+      <label>
+        Valor do orçamento (MT)
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          placeholder="Opcional"
+          [ngModel]="form().valorOrcamento"
+          (ngModelChange)="setField('valorOrcamento', $event)"
+        />
+      </label>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" (click)="closeForm()">Cancelar</button>
+        <button class="btn-primary" (click)="saveForm()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" *ngIf="pendingApproval() as pa" (click)="cancelApproval()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3>Aprovação de orçamento</h3>
+      <p class="modal-subtitle">
+        "{{ pa.titulo }}" — a aprovação segue os termos acordados com o cliente, não apenas a palavra.
+      </p>
+
+      <label>
+        Valor do orçamento (MT)
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          [ngModel]="approvalValor()"
+          (ngModelChange)="approvalValor.set($event)"
+        />
+      </label>
+
+      <label>
+        Condição de pagamento
+        <select [ngModel]="approvalCondicao()" (ngModelChange)="approvalCondicao.set($event)">
+          <option value="" disabled>Selecione...</option>
+          <option value="Sinal 60%">Sinal de 60%</option>
+          <option value="Pagamento Total">Pagamento Total (100%)</option>
+        </select>
+      </label>
+
+      <label>
+        Observações (opcional)
+        <textarea
+          rows="2"
+          placeholder="Ex: comprovativo de pagamento recebido..."
+          [ngModel]="approvalObservacao()"
+          (ngModelChange)="approvalObservacao.set($event)"
+        ></textarea>
+      </label>
+      <p class="modal-error" *ngIf="approvalError()">Indique o valor do orçamento e a condição de pagamento.</p>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" (click)="cancelApproval()">Cancelar</button>
+        <button class="btn-primary" (click)="confirmApproval()">Aprovar orçamento</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" *ngIf="pendingMove() as pm" (click)="cancelMove()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3>{{ moveModalTitle(pm) }}</h3>
+      <p class="modal-subtitle">
+        "{{ pm.titulo }}": <strong>{{ pm.from }}</strong> → <strong>{{ pm.to }}</strong>
+      </p>
+
+      <label>
+        Motivo
+        <textarea
+          rows="3"
+          placeholder="Descreva o motivo desta mudança de estado..."
+          [ngModel]="moveReason()"
+          (ngModelChange)="moveReason.set($event)"
+        ></textarea>
+      </label>
+      <p class="modal-error" *ngIf="moveReasonError()">O motivo é obrigatório para mudar de coluna.</p>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" (click)="cancelMove()">Cancelar</button>
+        <button class="btn-primary" (click)="confirmMove()">Confirmar mudança</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" *ngIf="historyEvent() as hv" (click)="closeHistory()">
+    <div class="modal modal-history" (click)="$event.stopPropagation()">
+      <div class="modal-header-row">
+        <div>
+          <h3>{{ hv.titulo }}</h3>
+          <span class="modal-subtitle" *ngIf="hv.clienteNome">🧑‍💼 {{ hv.clienteNome }}<span *ngIf="hv.clienteContacto"> · {{ hv.clienteContacto }}</span></span>
+        </div>
+        <button class="icon-btn" (click)="closeHistory()" title="Fechar">✕</button>
+      </div>
+
+      <div class="history-list">
+        <div class="history-item" *ngFor="let h of sortedHistory(hv)">
+          <div class="history-dot" [ngClass]="'history-' + h.tipo"></div>
+          <div class="history-content">
+            <div class="history-top">
+              <span class="history-type">{{ historyLabel(h) }}</span>
+              <span class="history-date">{{ h.data | date: 'dd/MM/yyyy HH:mm' }}</span>
+            </div>
+            <p class="history-text" *ngIf="h.texto">{{ h.texto }}</p>
+          </div>
+        </div>
+        <p class="history-empty" *ngIf="hv.historico.length === 0">Sem registos ainda.</p>
+      </div>
+
+      <div class="history-add">
+        <textarea
+          rows="2"
+          placeholder="Registar atividade diária..."
+          [ngModel]="newActivityText()"
+          (ngModelChange)="newActivityText.set($event)"
+        ></textarea>
+        <button class="btn-primary" (click)="addActivity()">+ Registar atividade</button>
+      </div>
+    </div>
+  </div>
+</div>
