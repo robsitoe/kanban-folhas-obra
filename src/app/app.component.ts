@@ -8,6 +8,7 @@ import {
   transferArrayItem,
 } from '@angular/cdk/drag-drop';
 import { EventStorageService } from './services/event-storage.service';
+import { AuthService } from './services/auth.service';
 import {
   CondicaoPagamento,
   EventPriority,
@@ -130,7 +131,26 @@ export class AppComponent {
   view = signal<ViewMode>('board');
   calendarMonth = signal<Date>(new Date());
 
-  constructor(public store: EventStorageService) {}
+  loginUsername = signal('');
+  loginPassword = signal('');
+  loginError = signal(false);
+
+  constructor(public store: EventStorageService, public auth: AuthService) {}
+
+  submitLogin(): void {
+    const ok = this.auth.login(this.loginUsername(), this.loginPassword());
+    if (!ok) {
+      this.loginError.set(true);
+      return;
+    }
+    this.loginError.set(false);
+    this.loginUsername.set('');
+    this.loginPassword.set('');
+  }
+
+  logout(): void {
+    this.auth.logout();
+  }
 
   scheduledEvents = computed(() => this.store.events().filter((e) => !!e.dataAgendamento));
 

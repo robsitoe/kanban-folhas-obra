@@ -1,4 +1,5 @@
 import { Injectable, signal } from '@angular/core';
+import { RealtimeChannel } from '@supabase/supabase-js';
 import {
   CondicaoPagamento,
   EventStatus,
@@ -7,8 +8,9 @@ import {
   KanbanEvent,
   STATUS_COLUMNS,
 } from '../models/event.model';
+import { supabase } from './supabase.client';
 
-const STORAGE_KEY = 'kanban-eventos-v1';
+const TABLE = 'eventos';
 
 const LEGACY_STATUS_MAP: Record<string, EventStatus> = {
   'Por Realizar': 'Em Execução',
@@ -33,211 +35,135 @@ function creationEntry(status: EventStatus, quando: string): HistoryEntry {
   };
 }
 
-function seedData(): KanbanEvent[] {
-  const now = new Date().toISOString();
-  const base: Omit<KanbanEvent, 'id' | 'historico'>[] = [
-    {
-      titulo: 'Verificar stock de válvulas',
-      descricao: 'Tarefa interna, não é uma folha de obra para cliente',
-      clienteNome: '',
-      clienteContacto: '',
-      clienteEndereco: '',
-      responsavel: 'Gilberto',
-      dataPrevista: new Date().toISOString().slice(0, 10),
-      prioridade: 'Baixa',
-      status: 'Pendente',
-      criadoEm: now,
-    },
-    {
-      titulo: 'Fuga de gás - Cliente Beira',
-      descricao: 'Cliente reportou cheiro a gás na cozinha',
-      clienteNome: 'Restaurante Baía Azul',
-      clienteContacto: '84 123 4567',
-      clienteEndereco: 'Av. Marginal, Beira',
-      responsavel: 'Gilberto',
-      dataPrevista: new Date().toISOString().slice(0, 10),
-      prioridade: 'Alta',
-      status: 'Folha de Obra',
-      criadoEm: now,
-    },
-    {
-      titulo: 'Revisão anual - Cliente Sede',
-      descricao: 'Aguarda confirmação de disponibilidade do cliente',
-      clienteNome: 'Condomínio Sede Business Park',
-      clienteContacto: '82 234 5678',
-      clienteEndereco: 'Av. 25 de Setembro, Maputo',
-      responsavel: 'Gilberto',
-      dataPrevista: new Date().toISOString().slice(0, 10),
-      prioridade: 'Baixa',
-      status: 'Por Agendar',
-      criadoEm: now,
-    },
-    {
-      titulo: 'Instalação de linha nova - Empazol',
-      descricao: 'Instalação de linha de gás industrial',
-      clienteNome: 'Empazol, Lda',
-      clienteContacto: '87 345 6789',
-      clienteEndereco: 'Zona Industrial da Matola',
-      responsavel: 'Joia',
-      dataPrevista: new Date().toISOString().slice(0, 10),
-      prioridade: 'Média',
-      status: 'Visita Agendada',
-      criadoEm: now,
-      dataAgendamento: (() => {
-        const d = new Date();
-        d.setDate(d.getDate() + 1);
-        d.setHours(9, 0, 0, 0);
-        return d.toISOString();
-      })(),
-    },
-    {
-      titulo: 'Substituição de regulador - Gás Solution',
-      descricao: 'Regulador com desgaste, aguarda aprovação do cliente',
-      clienteNome: 'Gás Solution, Lda',
-      clienteContacto: '84 456 7890',
-      clienteEndereco: 'Bairro Central, Maputo',
-      responsavel: 'Youra Eunice',
-      dataPrevista: new Date().toISOString().slice(0, 10),
-      prioridade: 'Média',
-      status: 'Orçamento',
-      criadoEm: now,
-      valorOrcamento: 8500,
-    },
-    {
-      titulo: 'Manutenção cilindro 11kg - Cliente Matola',
-      descricao: 'Verificar válvulas e substituir vedante',
-      clienteNome: 'João Machava',
-      clienteContacto: '82 567 8901',
-      clienteEndereco: 'Bairro Fomento, Matola',
-      responsavel: 'Gilberto',
-      dataPrevista: new Date().toISOString().slice(0, 10),
-      prioridade: 'Alta',
-      status: 'Aprovado',
-      criadoEm: now,
-      valorOrcamento: 4200,
-      condicaoPagamento: 'Sinal 60%',
-    },
-    {
-      titulo: 'Entrega e troca de cilindros - Cliente X',
-      descricao: 'Rota Maputo Sede',
-      clienteNome: 'Padaria Central',
-      clienteContacto: '87 678 9012',
-      clienteEndereco: 'Rua da Rádio, Maputo Sede',
-      responsavel: 'Joia',
-      dataPrevista: new Date().toISOString().slice(0, 10),
-      prioridade: 'Média',
-      status: 'Em Execução',
-      criadoEm: now,
-      valorOrcamento: 3100,
-      condicaoPagamento: 'Pagamento Total',
-    },
-    {
-      titulo: 'Manutenção rede de gás - Hotel Estrela',
-      descricao: 'Obra concluída, aguarda liquidação do saldo pelo cliente',
-      clienteNome: 'Hotel Estrela do Índico',
-      clienteContacto: '82 890 1234',
-      clienteEndereco: 'Av. da Marginal, Maputo',
-      responsavel: 'Gilberto',
-      dataPrevista: new Date().toISOString().slice(0, 10),
-      prioridade: 'Alta',
-      status: 'Pendente de Pagamento',
-      criadoEm: now,
-      valorOrcamento: 12000,
-      condicaoPagamento: 'Sinal 60%',
-    },
-    {
-      titulo: 'Reparação de avaria - Cliente W',
-      descricao: 'Avaria em queimador industrial resolvida',
-      clienteNome: 'Wamba Indústrias',
-      clienteContacto: '84 789 0123',
-      clienteEndereco: 'Zona Industrial, Beira',
-      responsavel: 'Youra Eunice',
-      dataPrevista: new Date().toISOString().slice(0, 10),
-      prioridade: 'Baixa',
-      status: 'Finalizado',
-      criadoEm: now,
-      valorOrcamento: 5600,
-      condicaoPagamento: 'Pagamento Total',
-    },
-  ];
+/** Linha da tabela `eventos` no Supabase (snake_case). */
+interface EventoRow {
+  id: string;
+  titulo: string;
+  descricao: string;
+  cliente_nome: string;
+  cliente_contacto: string;
+  cliente_endereco: string;
+  responsavel: string;
+  data_prevista: string | null;
+  prioridade: string;
+  status: string;
+  criado_em: string;
+  historico: HistoryEntry[];
+  valor_orcamento: number | null;
+  condicao_pagamento: string | null;
+  data_agendamento: string | null;
+  ordem: number;
+}
 
-  return base.map((e) => {
-    const t0 = new Date(e.criadoEm).getTime();
-    const offset = (min: number) => new Date(t0 + min * 60 * 1000).toISOString();
+function rowToEvent(row: EventoRow): KanbanEvent {
+  return {
+    id: row.id,
+    titulo: row.titulo,
+    descricao: row.descricao,
+    clienteNome: row.cliente_nome,
+    clienteContacto: row.cliente_contacto,
+    clienteEndereco: row.cliente_endereco,
+    responsavel: row.responsavel,
+    dataPrevista: row.data_prevista ?? '',
+    prioridade: row.prioridade as KanbanEvent['prioridade'],
+    status: migrateStatus(row.status),
+    criadoEm: row.criado_em,
+    historico: Array.isArray(row.historico) ? row.historico : [],
+    valorOrcamento: row.valor_orcamento ?? undefined,
+    condicaoPagamento: (row.condicao_pagamento as CondicaoPagamento | null) ?? undefined,
+    dataAgendamento: row.data_agendamento ?? undefined,
+  };
+}
 
-    const historico: HistoryEntry[] = [creationEntry('Folha de Obra', e.criadoEm)];
-    if (e.condicaoPagamento) {
-      historico.push({
-        id: uid(),
-        tipo: 'aprovacao',
-        data: offset(5),
-        texto: `Orçamento aprovado: ${formatCurrencyMT(e.valorOrcamento ?? 0)} — ${e.condicaoPagamento}.`,
-        deStatus: 'Orçamento',
-        paraStatus: 'Aprovado',
-      });
-    }
-    const progressao: [EventStatus, EventStatus, string][] = [
-      ['Aprovado', 'Em Execução', 'Equipa técnica iniciou os trabalhos no local.'],
-      ['Em Execução', 'Pendente de Pagamento', 'Trabalho concluído; aguarda liquidação do saldo pelo cliente.'],
-      ['Pendente de Pagamento', 'Finalizado', 'Saldo recebido e serviço encerrado.'],
-    ];
-    const ordem: EventStatus[] = ['Aprovado', 'Em Execução', 'Pendente de Pagamento', 'Finalizado'];
-    const alvoIdx = ordem.indexOf(e.status);
-    if (alvoIdx > 0) {
-      progressao.slice(0, alvoIdx).forEach(([de, para, texto], i) => {
-        historico.push({
-          id: uid(),
-          tipo: 'status',
-          data: offset(10 + i * 10),
-          texto,
-          deStatus: de,
-          paraStatus: para,
-        });
-      });
-    }
-
-    return { ...e, id: uid(), historico };
-  });
+function eventToRow(ev: KanbanEvent, ordem: number): EventoRow {
+  return {
+    id: ev.id,
+    titulo: ev.titulo,
+    descricao: ev.descricao,
+    cliente_nome: ev.clienteNome,
+    cliente_contacto: ev.clienteContacto,
+    cliente_endereco: ev.clienteEndereco,
+    responsavel: ev.responsavel,
+    data_prevista: ev.dataPrevista || null,
+    prioridade: ev.prioridade,
+    status: ev.status,
+    criado_em: ev.criadoEm,
+    historico: ev.historico,
+    valor_orcamento: ev.valorOrcamento ?? null,
+    condicao_pagamento: ev.condicaoPagamento ?? null,
+    data_agendamento: ev.dataAgendamento ?? null,
+    ordem,
+  };
 }
 
 @Injectable({ providedIn: 'root' })
 export class EventStorageService {
-  events = signal<KanbanEvent[]>(this.load());
+  events = signal<KanbanEvent[]>([]);
+  loading = signal(true);
+  syncError = signal<string | null>(null);
 
-  private load(): KanbanEvent[] {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        const seeded = seedData();
-        this.persist(seeded);
-        return seeded;
-      }
-      const parsed = JSON.parse(raw) as KanbanEvent[];
-      // Migração: eventos gravados com o fluxo antigo (Pendente/Por Realizar/Concluído),
-      // sem histórico, ou sem dados do cliente ganham os novos campos.
-      return parsed.map((e) => {
-        const status = migrateStatus(e.status as unknown as string);
-        return {
-          ...e,
-          status,
-          historico: e.historico ?? [creationEntry(status, e.criadoEm)],
-          clienteNome: e.clienteNome ?? '',
-          clienteContacto: e.clienteContacto ?? '',
-          clienteEndereco: e.clienteEndereco ?? '',
-        };
-      });
-    } catch {
-      return seedData();
+  private channel: RealtimeChannel | null = null;
+
+  constructor() {
+    this.init();
+  }
+
+  private async init(): Promise<void> {
+    await this.loadFromServer();
+    this.subscribeRealtime();
+  }
+
+  private async loadFromServer(): Promise<void> {
+    this.loading.set(true);
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('*')
+      .order('ordem', { ascending: true })
+      .order('criado_em', { ascending: false });
+
+    if (error) {
+      this.syncError.set('Não foi possível ligar à base de dados. A verificar ligação...');
+      this.loading.set(false);
+      return;
+    }
+
+    this.syncError.set(null);
+    this.events.set((data as EventoRow[]).map(rowToEvent));
+    this.loading.set(false);
+  }
+
+  private subscribeRealtime(): void {
+    this.channel = supabase
+      .channel('eventos-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: TABLE }, (payload) => {
+        if (payload.eventType === 'DELETE') {
+          const oldId = (payload.old as { id: string }).id;
+          this.events.update((list) => list.filter((e) => e.id !== oldId));
+          return;
+        }
+        const incoming = rowToEvent(payload.new as EventoRow);
+        this.events.update((list) => {
+          const idx = list.findIndex((e) => e.id === incoming.id);
+          if (idx === -1) return [incoming, ...list];
+          const next = [...list];
+          next[idx] = incoming;
+          return next;
+        });
+      })
+      .subscribe();
+  }
+
+  private async persistRow(ev: KanbanEvent, ordem = 0): Promise<void> {
+    const { error } = await supabase.from(TABLE).upsert(eventToRow(ev, ordem));
+    if (error) {
+      this.syncError.set('Falha ao guardar alteração. Verifique a ligação à internet.');
+    } else {
+      this.syncError.set(null);
     }
   }
 
-  private persist(events: KanbanEvent[]): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
-  }
-
-  private commit(events: KanbanEvent[]): void {
+  private setLocal(events: KanbanEvent[]): void {
     this.events.set(events);
-    this.persist(events);
   }
 
   add(event: Omit<KanbanEvent, 'id' | 'criadoEm' | 'historico'>): void {
@@ -248,15 +174,26 @@ export class EventStorageService {
       criadoEm,
       historico: [creationEntry(event.status, criadoEm)],
     };
-    this.commit([newEvent, ...this.events()]);
+    this.setLocal([newEvent, ...this.events()]);
+    void this.persistRow(newEvent);
   }
 
   update(id: string, changes: Partial<KanbanEvent>): void {
-    this.commit(this.events().map((e) => (e.id === id ? { ...e, ...changes } : e)));
+    const updated = this.events().map((e) => (e.id === id ? { ...e, ...changes } : e));
+    this.setLocal(updated);
+    const ev = updated.find((e) => e.id === id);
+    if (ev) void this.persistRow(ev);
   }
 
   remove(id: string): void {
-    this.commit(this.events().filter((e) => e.id !== id));
+    this.setLocal(this.events().filter((e) => e.id !== id));
+    void supabase
+      .from(TABLE)
+      .delete()
+      .eq('id', id)
+      .then(({ error }) => {
+        if (error) this.syncError.set('Falha ao apagar. Verifique a ligação à internet.');
+      });
   }
 
   /** Muda o estado de uma folha de obra, exigindo um motivo que fica registado no histórico. */
@@ -274,9 +211,9 @@ export class EventStorageService {
       paraStatus: status,
     };
 
-    this.commit(
-      events.map((e) => (e.id === id ? { ...e, status, historico: [...e.historico, entry] } : e))
-    );
+    const updatedEv = { ...ev, status, historico: [...ev.historico, entry] };
+    this.setLocal(events.map((e) => (e.id === id ? updatedEv : e)));
+    void this.persistRow(updatedEv);
   }
 
   /**
@@ -298,19 +235,15 @@ export class EventStorageService {
       paraStatus: 'Aprovado',
     };
 
-    this.commit(
-      events.map((e) =>
-        e.id === id
-          ? {
-              ...e,
-              status: 'Aprovado',
-              valorOrcamento: valor,
-              condicaoPagamento: condicao,
-              historico: [...e.historico, entry],
-            }
-          : e
-      )
-    );
+    const updatedEv: KanbanEvent = {
+      ...ev,
+      status: 'Aprovado',
+      valorOrcamento: valor,
+      condicaoPagamento: condicao,
+      historico: [...ev.historico, entry],
+    };
+    this.setLocal(events.map((e) => (e.id === id ? updatedEv : e)));
+    void this.persistRow(updatedEv);
   }
 
   /** Agenda a visita ao cliente: regista a data/hora combinada e move para "Visita Agendada". */
@@ -333,13 +266,14 @@ export class EventStorageService {
       paraStatus: 'Visita Agendada',
     };
 
-    this.commit(
-      events.map((e) =>
-        e.id === id
-          ? { ...e, status: 'Visita Agendada', dataAgendamento, historico: [...e.historico, entry] }
-          : e
-      )
-    );
+    const updatedEv: KanbanEvent = {
+      ...ev,
+      status: 'Visita Agendada',
+      dataAgendamento,
+      historico: [...ev.historico, entry],
+    };
+    this.setLocal(events.map((e) => (e.id === id ? updatedEv : e)));
+    void this.persistRow(updatedEv);
   }
 
   /**
@@ -361,13 +295,14 @@ export class EventStorageService {
       paraStatus: 'Finalizado',
     };
 
-    this.commit(
-      events.map((e) =>
-        e.id === id
-          ? { ...e, status: 'Finalizado', condicaoPagamento: 'Pagamento Total', historico: [...e.historico, entry] }
-          : e
-      )
-    );
+    const updatedEv: KanbanEvent = {
+      ...ev,
+      status: 'Finalizado',
+      condicaoPagamento: 'Pagamento Total',
+      historico: [...ev.historico, entry],
+    };
+    this.setLocal(events.map((e) => (e.id === id ? updatedEv : e)));
+    void this.persistRow(updatedEv);
   }
 
   reorderWithinStatus(orderedIds: string[], status: EventStatus): void {
@@ -375,13 +310,21 @@ export class EventStorageService {
     const moved = orderedIds
       .map((id) => this.events().find((e) => e.id === id))
       .filter((e): e is KanbanEvent => !!e);
-    this.commit([...others, ...moved]);
+    this.setLocal([...others, ...moved]);
+
+    moved.forEach((ev, i) => {
+      void this.persistRow(ev, i);
+    });
   }
 
   /** Regista uma atividade diária no histórico do evento. */
   addActivity(id: string, texto: string): void {
     const t = texto.trim();
     if (!t) return;
+
+    const events = this.events();
+    const ev = events.find((e) => e.id === id);
+    if (!ev) return;
 
     const entry: HistoryEntry = {
       id: uid(),
@@ -390,8 +333,8 @@ export class EventStorageService {
       texto: t,
     };
 
-    this.commit(
-      this.events().map((e) => (e.id === id ? { ...e, historico: [...e.historico, entry] } : e))
-    );
+    const updatedEv = { ...ev, historico: [...ev.historico, entry] };
+    this.setLocal(events.map((e) => (e.id === id ? updatedEv : e)));
+    void this.persistRow(updatedEv);
   }
 }

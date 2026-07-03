@@ -1,4 +1,26 @@
-<div class="app">
+<div class="login-screen" *ngIf="!auth.authenticated()">
+  <form class="login-box" (ngSubmit)="submitLogin()">
+    <h1>Folhas de Obra</h1>
+    <span class="subtitle">Mavi-Gás &amp; Comércio Geral</span>
+
+    <label>
+      Utilizador
+      <input type="text" autocomplete="username" [ngModel]="loginUsername()" (ngModelChange)="loginUsername.set($event)" name="username" />
+    </label>
+    <label>
+      Password
+      <input type="password" autocomplete="current-password" [ngModel]="loginPassword()" (ngModelChange)="loginPassword.set($event)" name="password" />
+    </label>
+    <p class="modal-error" *ngIf="loginError()">Utilizador ou password incorretos.</p>
+
+    <button type="submit" class="btn-primary">Entrar</button>
+  </form>
+</div>
+
+<div class="app" *ngIf="auth.authenticated()">
+  <div class="sync-banner" *ngIf="store.syncError() as err">⚠ {{ err }}</div>
+  <div class="sync-banner sync-banner-loading" *ngIf="store.loading()">A carregar dados...</div>
+
   <header class="topbar">
     <div class="brand">
       <h1>Folhas de Obra</h1>
@@ -25,6 +47,7 @@
         <button [class.active]="view() === 'summary'" (click)="view.set('summary')">📋 Resumo</button>
       </div>
       <button class="btn-primary" (click)="openNewForm()">+ Novo evento</button>
+      <button class="btn-icon" (click)="logout()" title="Terminar sessão">🚪 Sair</button>
     </div>
   </header>
 
