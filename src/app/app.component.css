@@ -872,3 +872,67 @@
   font-family: inherit;
   resize: vertical;
 }
+
+@media (max-width: 640px) {
+  .topbar {
+    padding: 10px 12px;
+  }
+
+  .topbar-actions {
+    width: 100%;
+  }
+
+  .search {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .view-toggle button {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .board {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .column {
+    min-width: 86vw;
+    scroll-snap-align: start;
+  }
+
+  .board {
+    scroll-snap-type: x mandatory;
+  }
+
+  .modal {
+    width: 100%;
+    padding: 16px;
+  }
+
+  .form-row {
+    flex-direction: column;
+  }
+
+  .calendar-grid {
+    grid-template-columns: repeat(7, minmax(38px, 1fr));
+  }
+
+  .calendar-day {
+    min-height: 60px;
+    padding: 3px;
+  }
+
+  .calendar-chip {
+    font-size: 9px;
+  }
+
+  .summary-table {
+    font-size: 11px;
+  }
+
+  .summary-reason-cell {
+    min-width: 160px;
+  }
+}
