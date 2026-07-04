@@ -27,18 +27,32 @@ Basta clonar o repositório e mostrar este ficheiro ao Claude Code.
   - Utilizador criado: `roberto.manuelsitoe@gmail.com` (password definida
     diretamente no painel do Supabase, não fica guardada em código).
 - Repositório GitHub: https://github.com/robsitoe/kanban-folhas-obra
+- **Alojado online no Vercel**: https://kanban-folhas-obra-nu.vercel.app/
+  (deploy automático a cada `git push`).
+- **APK Android gerado** (Bubblewrap/TWA), em `com.mavigas.folhasobra`.
+  - Projeto de build: pasta `twa-build/` (não vai para o Git — está no
+    `.gitignore` porque contém a chave de assinatura).
+  - Ficheiro instalável: `kanban-folhas-obra.apk` na raiz do projeto
+    (também fora do Git — é um binário, guarda-se localmente).
+  - Credenciais da keystore (necessárias para gerar futuras atualizações
+    do mesmo app): `twa-build/CREDENCIAIS-KEYSTORE.txt` (só neste
+    computador — **faça backup deste ficheiro nalgum sítio seguro**, se
+    se perder não é possível atualizar o app já instalado, só publicar
+    como app novo).
+  - Para gerar de novo (ex: depois de mudar o manifest.webmanifest):
+    `cd twa-build && node generate.js` (regenera o projeto, mantém a
+    keystore existente) e depois `./gradlew.bat assembleRelease` +
+    zipalign + apksigner (ver histórico de comandos ou pedir ao Claude).
 
 ## Por fazer (pela ordem combinada)
 
-1. **Alojar online** (Vercel ou Netlify) — para ter um link público fixo,
-   acessível de qualquer lugar, sem depender do PC ligado.
-2. **Gerar .apk** com Bubblewrap, depois de estar online (precisa de um
-   URL https real, não funciona com localhost).
-3. **Notificações**: visitas agendadas, pagamentos pendentes, atividades
+1. **Notificações**: visitas agendadas, pagamentos pendentes, atividades
    diárias registadas. Requer configurar VAPID keys + Supabase Edge
    Function para disparar os avisos.
-4. (Opcional, discutido) Criar utilizadores adicionais no Supabase Auth
+2. (Opcional, discutido) Criar utilizadores adicionais no Supabase Auth
    para a equipa (Gilberto, Joia, Youra Eunice), em vez de um único login.
+3. (Opcional) Publicar o .apk na Play Store — requer conta de developer
+   Google (~25 USD, pagamento único) e passar pelo processo de revisão.
 
 ## Como correr localmente
 

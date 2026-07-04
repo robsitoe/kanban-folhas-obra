@@ -40,3 +40,8 @@ testem.log
 # System files
 .DS_Store
 Thumbs.db
+
+# Build do APK Android (Bubblewrap/Gradle) — contém a chave de assinatura
+# e as suas passwords, nunca deve ir para um repositório público.
+/twa-build/
+*.apk
