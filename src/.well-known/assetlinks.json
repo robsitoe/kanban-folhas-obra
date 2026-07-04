@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.mavigas.folhasobra",
+      "sha256_cert_fingerprints": [
+        "7C:C5:FB:EA:D2:D8:9A:EC:5E:50:5A:1B:E7:51:0B:51:71:B5:94:23:9A:CB:0B:C7:94:97:03:BB:04:BE:B1:28"
+      ]
+    }
+  }
+]
